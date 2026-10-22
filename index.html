@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mundo de bloques</title>
+<style>
+:root{--bg:#0e1a12;--ink:#eef3ea;--panel:rgba(12,22,16,.9);--line:rgba(238,243,234,.4);--on:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a120d}}
+:root[data-theme="dark"]{--bg:#0a120d}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Trebuchet MS",system-ui,sans-serif;overflow:hidden}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+#ov{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,14,10,.65);padding:12px;overflow:auto}
+.card{max-width:520px;background:var(--panel);border:2px solid var(--line);padding:18px 22px}
+h1{margin:0 0 8px;font-size:24px}
+p{margin:0 0 8px}.k{font-size:13px;opacity:.85}
+.row{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+#pv{background:rgba(255,255,255,.08);border:2px solid var(--line);width:150px;height:210px}
+.f{display:flex;flex-direction:column;gap:6px;flex:1;min-width:190px}
+label{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
+input[type=text]{width:120px;padding:4px 6px;background:#0008;color:var(--ink);border:2px solid var(--line);font:inherit}
+input.bad{border-color:#f55}
+input[type=color]{width:46px;height:28px;border:2px solid var(--line);background:none;padding:0}
+#an{display:flex;flex-wrap:wrap;gap:4px}
+button{font:inherit;color:var(--ink);background:#0008;border:2px solid var(--line);padding:3px 8px;cursor:pointer}
+button.on{border-color:var(--on);background:#fff3}
+#go{display:block;width:100%;margin-top:8px;padding:9px;font-weight:700;border-color:var(--on)}
+#hb{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:4px}
+.s{width:44px;height:44px;border:2px solid var(--line);background-color:var(--panel);image-rendering:pixelated;cursor:pointer}
+.s.on{border-color:var(--on);box-shadow:0 0 0 2px var(--on)}
+#ch{position:fixed;left:50%;top:50%;width:20px;height:20px;margin:-10px;pointer-events:none;mix-blend-mode:difference}
+#ch::before,#ch::after{content:"";position:absolute;background:#fff}
+#ch::before{left:9px;top:0;width:2px;height:20px}
+#ch::after{top:9px;left:0;height:2px;width:20px}
+#st{position:fixed;left:10px;top:calc(8px + env(safe-area-inset-top,0px));background:var(--panel);padding:3px 10px;font-size:13px;border:2px solid var(--line)}
+#sky{position:fixed;inset:0;background:linear-gradient(#2f6fd6 0%,#8fc4ff 50%,#8fc4ff 100%);background-size:100% 300vh}
+#iv{position:fixed;inset:0;display:none;place-items:center;background:rgba(8,14,10,.65);padding:12px}
+#iv .card{text-align:center}
+#ig{display:grid;grid-template-columns:repeat(5,56px);gap:6px;justify-content:center;margin:10px 0}
+#ig .s{width:56px;height:56px}
+.sm{font-size:12px;opacity:.8}
+</style>
+</head>
+<body>
+<div id="sky"></div><canvas id="c"></canvas>
+<div id="ch"></div><div id="hb"></div><div id="st">Modo libre</div>
+<div id="ov"><div class="card">
+<h1>Mundo de bloques</h1>
+<div class="row">
+<canvas id="pv" width="150" height="210"></canvas>
+<div class="f">
+<label>Nombre<input type="text" id="nm" maxlength="16" placeholder="tu usuario"></label>
+<label>Piel<input type="color" id="c0" value="#e0ac84"></label>
+<label>Camiseta<input type="color" id="c1" value="#3b82f6"></label>
+<label>Pantalón<input type="color" id="c2" value="#2f3b6b"></label>
+<label>Texturas<span id="ts" class="sm">Del juego</span></label>
+<div style="display:flex;gap:4px;flex-wrap:wrap"><button id="tx">Cargar .jar / .zip / .png</button><button id="tr">Restaurar</button></div><input type="file" id="fl" accept=".jar,.zip,.png" multiple hidden>
+<div id="an"><button data-k="idle" class="on">Quieto</button><button data-k="walk">Caminar</button><button data-k="run">Correr</button><button data-k="wave">Saludar</button><button data-k="jump">Saltar</button></div>
+</div></div>
+<p class="k" style="margin-top:10px">WASD mover · Espacio saltar · Shift correr · F volar · V tercera persona · G saludar<br>Clic izq. rompe · clic der. coloca · 1–9 o rueda elige bloque · E inventario · Esc menú de pausa</p>
+<button id="go">Jugar</button>
+</div></div>
+<div id="iv"><div class="card"><h1>Inventario</h1><p class="k">Pulsa un bloque para ponerlo en el slot seleccionado de la barra. E o Cerrar para volver.</p><div id="ig"></div><button id="ic">Cerrar</button></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(()=>{
+const $=s=>document.querySelector(s),cv=$('#c'),gl=cv.getContext('webgl2',{antialias:true});
+if(!gl){$('#ov').innerHTML='<div class="card"><h1>WebGL2 no disponible</h1></div>';return}
+const CS=16,H=64,SEA=24,R=5,SEED=1337,SKY=[.56,.77,1],TR={6:1,7:1,10:1},SM=2048;
+const rnd=(a,b,c)=>{let h=Math.imul(a,374761393)^Math.imul(b,668265263)^Math.imul(c,1274126177);h=Math.imul(h^(h>>>13),1103515245);return((h^(h>>>16))>>>0)/4294967295};
+
+const ld=()=>{try{const m=document.cookie.match(/(?:^|; )mb=([^;]*)/);if(m)return JSON.parse(decodeURIComponent(m[1]))}catch(e){}try{return JSON.parse(localStorage.mb)}catch(e){return null}};
+const sv=o=>{const s=JSON.stringify(o);try{document.cookie='mb='+encodeURIComponent(s)+';max-age=31536000;path=/;SameSite=Lax'}catch(e){}try{localStorage.mb=s}catch(e){}};
+const U=Object.assign({n:'',c:['#e0ac84','#3b82f6','#2f3b6b']},ld()||{});
+$('#nm').value=U.n;U.c.forEach((v,i)=>$('#c'+i).value=v);
+const hx=h=>/^#[0-9a-f]{6}$/i.test(h)?[1,3,5].map(i=>parseInt(h.substr(i,2),16)/255):[.6,.6,.6];
+
+const defA=document.createElement('canvas');defA.width=defA.height=64;let atlas=defA;
+const actx=defA.getContext('2d'),img=actx.createImageData(64,64);
+const base=[[96,160,56],[134,96,67],[134,96,67],[125,125,125],[219,207,142],[106,84,52],[165,134,84],[58,128,48],[52,104,204],[245,245,245],[180,144,90],[110,110,110],[200,230,255],[150,64,50]];
+for(let t=0;t<14;t++)for(let y=0;y<16;y++)for(let x=0;x<16;x++){
+  let c=base[t],n=(rnd(t,x,y)-.5)*36,a=255;
+  if(t==1&&y<4)c=base[0];
+  if(t==5&&x%4==0)n-=25;
+  if(t==6){const d=Math.max(Math.abs(x-7.5),Math.abs(y-7.5));if(d>6.5)c=base[5];else if((d|0)%2)n-=18}
+  if(t==7&&rnd(t,x,y)>.75)n-=40;
+  if(t==9)n*=.15;
+  if(t==10&&y%4==0)n-=25;
+  if(t==11)n=(rnd(t,x>>2,y>>2)-.5)*50+(rnd(t,x,y)-.5)*20;
+  if(t==12){n*=.3;if(!(x==0||y==0||x==15||y==15||x==y||x==y+1))a=0}
+  if(t==13&&(y%4==3||(x+((y>>2)%2)*4)%8==7)){c=[200,200,190];n*=.4}
+  const i=(((t>>2)*16+y)*64+(t%4)*16+x)*4;
+  img.data[i]=c[0]+n;img.data[i+1]=c[1]+n;img.data[i+2]=c[2]+n;img.data[i+3]=a}
+actx.putImageData(img,0,0);
+const BT={1:[0,2,1],2:[2,2,2],3:[3,3,3],4:[4,4,4],5:[6,6,5],6:[7,7,7],7:[8,8,8],8:[10,10,10],9:[11,11,11],10:[12,12,12],11:[13,13,13]};
+
+const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);return o};
+const pg=gl.createProgram();
+gl.attachShader(pg,sh(gl.VERTEX_SHADER,`#version 300 es
+in vec3 p;in vec2 uv;in float s;uniform mat4 m,ls;uniform vec3 cam;out vec2 vuv;out float vs;out float vd;out vec3 vl;
+void main(){gl_Position=m*vec4(p,1.);vuv=uv;vs=s;vd=distance(p,cam);vl=(ls*vec4(p,1.)).xyz*.5+.5;}`));
+gl.attachShader(pg,sh(gl.FRAGMENT_SHADER,`#version 300 es
+precision highp float;precision highp sampler2DShadow;
+in vec2 vuv;in float vs;in float vd;in vec3 vl;uniform sampler2D t;uniform sampler2DShadow sh;uniform vec3 sky,tn;out vec4 o;
+void main(){vec4 tx=texture(t,vuv);if(tx.a<.5)discard;vec3 c=tx.rgb*vs*tn;float l=0.;
+for(int i=-1;i<=1;i++)for(int j=-1;j<=1;j++)l+=texture(sh,vec3(vl.xy+vec2(i,j)/${SM}.,vl.z-.0006));
+l/=9.;if(vl.x<0.||vl.x>1.||vl.y<0.||vl.y>1.||vl.z>1.)l=1.;
+c*=mix(.5,1.,l);
+o=vec4(mix(c,sky,clamp((vd-40.)/${R*16-46}.,0.,1.)),1.);}`));
+gl.linkProgram(pg);gl.useProgram(pg);
+const U_=n=>gl.getUniformLocation(pg,n),um=U_('m'),ul=U_('ls'),uc=U_('cam'),ut=U_('tn'),aP=gl.getAttribLocation(pg,'p'),aU=gl.getAttribLocation(pg,'uv'),aS=gl.getAttribLocation(pg,'s');
+gl.uniform3fv(U_('sky'),SKY);gl.uniform1i(U_('t'),0);gl.uniform1i(U_('sh'),1);
+const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,atlas);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+const dtx=gl.createTexture(),fb=gl.createFramebuffer();
+gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,dtx);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,SM,SM,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
+for(const[a,b]of[[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE],[gl.TEXTURE_COMPARE_MODE,gl.COMPARE_REF_TO_TEXTURE],[gl.TEXTURE_COMPARE_FUNC,gl.LEQUAL]])gl.texParameteri(gl.TEXTURE_2D,a,b);
+gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,dtx,0);gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);
+gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.activeTexture(gl.TEXTURE0);
+gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);
+
+const mul=(a,b)=>{const o=new Float32Array(16);for(let i=0;i<4;i++)for(let j=0;j<4;j++){let s=0;for(let k=0;k<4;k++)s+=a[k*4+j]*b[i*4+k];o[i*4+j]=s}return o};
+const persp=(f,a,n,z)=>{const t=1/Math.tan(f/2),o=new Float32Array(16);o[0]=t/a;o[5]=t;o[10]=(z+n)/(n-z);o[11]=-1;o[14]=2*z*n/(n-z);return o};
+const ort=h=>{const o=new Float32Array(16);o[0]=o[5]=1/h;o[10]=-2/199;o[14]=-201/199;o[15]=1;return o};
+const look=(e,f)=>{let l=Math.hypot(f[0],f[2]);const s=[-f[2]/l,0,f[0]/l],u=[s[1]*f[2]-s[2]*f[1],s[2]*f[0]-s[0]*f[2],s[0]*f[1]-s[1]*f[0]],o=new Float32Array(16),d=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  o[0]=s[0];o[4]=s[1];o[8]=s[2];o[1]=u[0];o[5]=u[1];o[9]=u[2];o[2]=-f[0];o[6]=-f[1];o[10]=-f[2];o[12]=-d(s,e);o[13]=-d(u,e);
